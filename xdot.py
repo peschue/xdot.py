@@ -1256,8 +1256,8 @@ class XDotParser(DotParser):
 
     def transform(self, x, y):
         # XXX: this is not the right place for this code
-        x = (x + self.xoffset)*self.xscale
-        y = (y + self.yoffset)*self.yscale
+        #x = (x + self.xoffset)*self.xscale
+        #y = (y + self.yoffset)*self.yscale
         return x, y
 
 
@@ -1407,6 +1407,11 @@ class NullAction(DragAction):
         if item is not None:
             dot_widget.window.set_cursor(gtk.gdk.Cursor(gtk.gdk.HAND2))
             dot_widget.set_highlight(item.highlight)
+            if isinstance(item, Jump):
+              subitem = item.item
+              if isinstance(subitem, Node):
+                node = subitem
+                print "NODE", node.id, node.x, node.y
         else:
             dot_widget.window.set_cursor(gtk.gdk.Cursor(gtk.gdk.ARROW))
             dot_widget.set_highlight(None)
@@ -1478,7 +1483,7 @@ class DotWidget(gtk.DrawingArea):
         'clicked' : (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_STRING, gtk.gdk.Event))
     }
 
-    filter = 'dot'
+    filter = 'fdp' #'dot'
 
     def __init__(self):
         gtk.DrawingArea.__init__(self)
@@ -1529,6 +1534,7 @@ class DotWidget(gtk.DrawingArea):
             error = '%s: %s' % (self.filter, exc.strerror)
             p = subprocess.CalledProcessError(exc.errno, self.filter, exc.strerror)
         else:
+            print "SENDING", dotcode
             xdotcode, error = p.communicate(dotcode)
         error = error.rstrip()
         sys.stderr.write(error + '\n')
@@ -1808,10 +1814,7 @@ class DotWidget(gtk.DrawingArea):
         return (time.time() < self.presstime + click_timeout
                 and math.hypot(deltax, deltay) < click_fuzz)
 
-    def on_click(self, element, event):
-        """Override this method in subclass to process
-        click events. Note that element can be None
-        (click on empty space)."""
+    def on_click_remove(self, element, event):
         if element is not None and isinstance(element, Node):
           # remove nodes and their edges from dotfile when clicked
           nid = element.id
@@ -1834,6 +1837,38 @@ class DotWidget(gtk.DrawingArea):
           newdotcode = rToremove.sub(repl='', string=self.dotcode)
           self.set_dotcode(newdotcode)
         return True
+
+    def on_click_move(self, element, event):
+        if element is None or not isinstance(element, Node):
+            return False
+        self.move_to(event.x, event.y)
+
+    def move_node_to(self, x, y):
+        # move node to clicked position
+        nid = 'boxpredlpar'
+        #x, y = self.window2graph(x, y)
+        x, y = x, y
+        import re
+        #print "ORIGINAL\n", self.dotcode, "\nENDORIGINAL"
+        toreplace = r"""
+          (^{nid} \s* \[)(?:pos="[^"]+",)?
+        """.format(nid=nid)
+        rToreplace = re.compile(toreplace, re.VERBOSE | re.MULTILINE)
+        matches = rToreplace.findall(self.dotcode)
+        #if matches:
+        #  print '\n'.join(matches)
+        #else:
+        #  print "not found"
+        patched = matches[0]+'pos="{x},{y}!",'.format(x=x,y=y)
+        print patched
+        newdotcode = rToreplace.sub(repl=patched, string=self.dotcode)
+        self.set_dotcode(newdotcode)
+
+    def on_click(self, element, event):
+        """Override this method in subclass to process
+        click events. Note that element can be None
+        (click on empty space)."""
+        return self.on_click_move(element, event)
 
     def on_area_button_release(self, area, event):
         self.drag_action.on_button_release(event)
@@ -1872,6 +1907,10 @@ class DotWidget(gtk.DrawingArea):
 
     def on_area_motion_notify(self, area, event):
         self.drag_action.on_motion_notify(event)
+        print "move event ", event.x, event.y
+        x, y = self.window2graph(event.x, event.y)
+        print "window2graph ", x, y
+        self.move_node_to(x/72.0, y/72.0)
         return True
 
     def on_area_size_allocate(self, area, allocation):
