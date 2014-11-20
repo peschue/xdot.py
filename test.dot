@@ -1,0 +1,10 @@
+digraph out {
+layout=neato;
+boxvarl0_e9r[label="0/e9"];
+boxvarl0_e10r[label="0/e10"];
+boxvarl0_e1r[label="0/e1"];
+boxpredlpar[label="[]:imp(e9,e10,e1)",tooltip="pa/0:imp/null"];
+boxpredlpar -> boxvarl0_e9r[label="0"];
+boxpredlpar -> boxvarl0_e10r[label="1"];
+boxpredlpar -> boxvarl0_e1r[label="2"];
+}

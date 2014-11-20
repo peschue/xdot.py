@@ -1411,7 +1411,7 @@ class NullAction(DragAction):
               subitem = item.item
               if isinstance(subitem, Node):
                 node = subitem
-                print "NODE", node.id, node.x, node.y
+                print "NODE", node.id, node.x1, node.y1, node.x2, node.y2, "w/h",node.x2-node.x1, node.y2-node.y1, "event", x, y
         else:
             dot_widget.window.set_cursor(gtk.gdk.Cursor(gtk.gdk.ARROW))
             dot_widget.set_highlight(None)
@@ -1578,6 +1578,20 @@ class DotWidget(gtk.DrawingArea):
         parser = XDotParser(xdotcode)
         self.graph = parser.parse()
         self.zoom_image(self.zoom_ratio, center=True)
+        if self.dotcode.find('magicboundarynode') == -1:
+          # add four magic boundary nodes (pinned to the four corners)
+          xplus = self.graph.width*2.2
+          yplus = self.graph.height*2.2
+          x1, y1 = 0, 0 #-self.graph.width*0.5-xplus, -self.graph.height*0.5-yplus
+          x2, y2 = 2.0*self.graph.width, 2.0*self.graph.height #self.graph.width*0.5+xplus, self.graph.height*0.5+yplus
+          self.extranodes = '''
+            magicboundarynode11[pos="{x1},{y1}!",label="11"];
+            magicboundarynode12[pos="{x1},{y2}!",label="12"];
+            magicboundarynode21[pos="{x2},{y1}!",label="21"];
+            magicboundarynode22[pos="{x2},{y2}!",label="22"];
+            '''.format(x1=x1/72.0, x2=x2/72.0, y1=y1/72.0, y2=y2/72.0)
+          code = self.dotcode.strip()[:-1] + self.extranodes + '}'
+          self.set_dotcode(code)
 
     def reload(self):
         if self.openfilename is not None:
@@ -1859,7 +1873,8 @@ class DotWidget(gtk.DrawingArea):
         #  print '\n'.join(matches)
         #else:
         #  print "not found"
-        patched = matches[0]+'pos="{x},{y}!",'.format(x=x,y=y)
+        patched = matches[0]+'pos="{x},{y}!",'.format(x=x/72.0,y=y/72.0)
+        print self.extranodes
         print patched
         newdotcode = rToreplace.sub(repl=patched, string=self.dotcode)
         self.set_dotcode(newdotcode)
@@ -1910,7 +1925,8 @@ class DotWidget(gtk.DrawingArea):
         print "move event ", event.x, event.y
         x, y = self.window2graph(event.x, event.y)
         print "window2graph ", x, y
-        self.move_node_to(x/72.0, y/72.0)
+        x, y = event.x, event.y
+        self.move_node_to(x, y)
         return True
 
     def on_area_size_allocate(self, area, allocation):
