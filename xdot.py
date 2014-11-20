@@ -1487,6 +1487,7 @@ class DotWidget(gtk.DrawingArea):
         self.openfilename = None
 
         self.set_flags(gtk.CAN_FOCUS)
+        self.eliminated = set([]) # eliminated nodes
 
         self.add_events(gtk.gdk.BUTTON_PRESS_MASK | gtk.gdk.BUTTON_RELEASE_MASK)
         self.connect("button-press-event", self.on_area_button_press)
@@ -1543,6 +1544,7 @@ class DotWidget(gtk.DrawingArea):
 
     def set_dotcode(self, dotcode, filename=None):
         self.openfilename = None
+        self.dotcode = dotcode
         if isinstance(dotcode, unicode):
             dotcode = dotcode.encode('utf8')
         xdotcode = self.run_filter(dotcode)
@@ -1810,7 +1812,28 @@ class DotWidget(gtk.DrawingArea):
         """Override this method in subclass to process
         click events. Note that element can be None
         (click on empty space)."""
-        return False
+        if element is not None and isinstance(element, Node):
+          # remove nodes and their edges from dotfile when clicked
+          nid = element.id
+          self.eliminated.add(nid)
+          import re
+          #print "eliminating",nid
+          #print "ORIGINAL\n", self.dotcode, "\nENDORIGINAL"
+          toremove = r"""
+            (?: ^{nid} \s* (?:\[.*\])? \s* ;$ ) |
+            (?: ^{nid} \s* -> .* ;$) |
+            (?: ^ .* -> \s* {nid} \s* (?:\[.*\])? \s* ;$)
+          """.format(nid=nid)
+          #print toremove
+          rToremove = re.compile(toremove, re.VERBOSE | re.MULTILINE)
+          #matches = rToremove.findall(self.dotcode)
+          #if matches:
+          #  print '\n'.join(matches)
+          #else:
+          #  print "not found"
+          newdotcode = rToremove.sub(repl='', string=self.dotcode)
+          self.set_dotcode(newdotcode)
+        return True
 
     def on_area_button_release(self, area, event):
         self.drag_action.on_button_release(event)
